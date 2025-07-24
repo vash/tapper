@@ -21,6 +21,7 @@ type Executor struct {
 	streamingHandler *StreamingOutputHandler
 	userInteraction  *InteractionHandler
 	workspaceManager *workspace.WorkspaceManager
+	AdditionalArgs   []string // Additional arguments to pass to terraform commands
 }
 
 type ExecutionOptions struct {
@@ -43,6 +44,12 @@ func NewExecutor() (*Executor, error) {
 		userInteraction:  NewInteractionHandler(),
 		workspaceManager: wm,
 	}, nil
+}
+
+// SetAdditionalArgs sets additional arguments to be passed to terraform commands
+func (e *Executor) SetAdditionalArgs(args []string) error {
+	e.AdditionalArgs = args
+	return nil
 }
 
 // PlanExecution creates an execution plan by running the corresponding command in dry-run mode
@@ -79,6 +86,10 @@ func (e *Executor) PlanExecution(command string, profiles []Profile) (*Execution
 	if command == "destroy" {
 		previewArgs = append(previewArgs, "--destroy")
 	}
+
+	// Add additional arguments to preview args
+	previewArgs = append(previewArgs, e.AdditionalArgs...)
+
 	executionOptions := &ExecutionOptions{
 		Command: PREVIEW_COMMAND,
 		Args:    previewArgs,
@@ -96,7 +107,6 @@ func (e *Executor) PlanExecution(command string, profiles []Profile) (*Execution
 	fmt.Printf(strings.Repeat("=", 80) + "\n\n")
 
 	approvedProfiles, err := e.userInteraction.ReviewAndApproveResults(results)
-
 	if err != nil {
 		return nil, fmt.Errorf("error during streaming execution: %w", err)
 	}
@@ -111,6 +121,7 @@ func (e *Executor) ExecutePlan(plan *ExecutionPlan) ([]ExecutionResult, error) {
 	fmt.Printf("Executing %d profiles with real-time output...\n\n", len(approvedProfileStructs))
 	execOpts := &ExecutionOptions{
 		Command: plan.Command,
+		Args:    e.AdditionalArgs, // Include additional arguments
 		DryRun:  false,
 	}
 

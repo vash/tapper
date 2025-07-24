@@ -50,7 +50,10 @@ func (h *InteractionHandler) ReviewAndApproveResults(results []ExecutionResult) 
 		fmt.Println("No profiles approved for execution.")
 		return nil, nil
 	}
-
+	// If there's exactly one profile - don't verify
+	if len(results) == 1 {
+		return approvedProfiles, nil
+	}
 	return h.ConfirmBatchExecution(approvedProfiles)
 }
 

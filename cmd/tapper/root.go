@@ -30,7 +30,7 @@ If no profile is specified, displays an interactive selection menu.
 If one profile is specified, runs on that profile only.
 If multiple profiles are specified, runs in parallel across all profiles.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		executeCommand("apply", args)
+		executeCommand("apply", args, cmd)
 	},
 }
 
@@ -44,7 +44,7 @@ If no profile is specified, displays an interactive selection menu.
 If one profile is specified, runs on that profile only.
 If multiple profiles are specified, runs in parallel across all profiles.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		executeCommand("plan", args)
+		executeCommand("plan", args, cmd)
 	},
 }
 
@@ -58,12 +58,12 @@ If no profile is specified, displays an interactive selection menu.
 If one profile is specified, runs on that profile only.
 If multiple profiles are specified, runs in parallel across all profiles.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		executeCommand("destroy", args)
+		executeCommand("destroy", args, cmd)
 	},
 }
 
 // executeCommand handles the execution logic for all terraform commands
-func executeCommand(command string, profileArgs []string) {
+func executeCommand(command string, profileArgs []string, cmd *cobra.Command) {
 	utils.IsActiveDir()
 
 	cfg, err := terraform.LoadConfig()
@@ -106,6 +106,22 @@ func executeCommand(command string, profileArgs []string) {
 		os.Exit(1)
 	}
 
+	var additionalArgs []string
+	lockValue, err := cmd.Flags().GetBool("lock")
+	if err == nil {
+		if lockValue {
+			additionalArgs = append(additionalArgs, "-lock=true")
+		} else {
+			additionalArgs = append(additionalArgs, "-lock=false")
+		}
+	}
+
+	// Set additional args on the executor
+	if err := executor.SetAdditionalArgs(additionalArgs); err != nil {
+		fmt.Printf("Error setting additional arguments: %v\n", err)
+		os.Exit(1)
+	}
+
 	fmt.Printf("Creating execution plan for %s across %d profile(s)...\n", command, len(profiles))
 	//TODO: Add target selection
 	plan, err := executor.PlanExecution(command, profiles)
@@ -137,4 +153,9 @@ func executeCommand(command string, profileArgs []string) {
 
 func init() {
 	rootCmd.AddCommand(applyCmd, planCmd, destroyCmd)
+
+	// Add -lock flag to commands that support it (apply, plan, destroy)
+	applyCmd.Flags().BoolP("lock", "l", true, "Lock the state file when locking is supported")
+	planCmd.Flags().BoolP("lock", "l", true, "Lock the state file when locking is supported")
+	destroyCmd.Flags().BoolP("lock", "l", true, "Lock the state file when locking is supported")
 }
